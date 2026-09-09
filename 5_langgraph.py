@@ -9,17 +9,24 @@ from pydantic import BaseModel, Field
 from langsmith import traceable
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
+from langchain_google_genai import ChatGoogleGenerativeAI
+import os 
+from pydantic import SecretStr
 
 # ---------- Setup ----------
 load_dotenv()
-model = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+llm = ChatGoogleGenerativeAI(
+    model = "gemini-3.1-flash-lite",
+    api_key = SecretStr(os.environ["GOOGLE_API_KEY"]),
+    temperature = 0.7
+)
 
 # ---------- Structured schema & model ----------
 class EvaluationSchema(BaseModel):
     feedback: str = Field(description="Detailed feedback for the essay")
     score: int = Field(description="Score out of 10", ge=0, le=10)
 
-structured_model = model.with_structured_output(EvaluationSchema)
+structured_model = llm.with_structured_output(EvaluationSchema)
 
 # ---------- Sample essay ----------
 essay2 = """India and AI Time
@@ -87,7 +94,7 @@ def final_evaluation(state: UPSCState):
         f"Depth of analysis feedback: {state.get('analysis_feedback','')}\n"
         f"Clarity of thought feedback: {state.get('clarity_feedback','')}\n"
     )
-    overall = model.invoke(prompt).content
+    overall = llm.invoke(prompt).text
     scores = state.get("individual_scores", []) or []
     avg = (sum(scores) / len(scores)) if scores else 0.0
     return {"overall_feedback": overall, "avg_score": avg}
@@ -120,7 +127,7 @@ if __name__ == "__main__":
             "tags": ["essay", "langgraph", "evaluation"],
             "metadata": {
                 "essay_length": len(essay2),
-                "model": "gpt-4o-mini",
+                "model": "gemini-3.1-flash-lite",
                 "dimensions": ["language", "analysis", "clarity"],
             },
         },
